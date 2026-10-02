@@ -16,6 +16,7 @@ import { registerCursorAgentsContextDedup } from "./cursor-agents-context-regist
 import { registerCursorOverflowNormalization } from "./cursor-provider-overflow.js";
 import { registerCursorSdkSessionProcessErrorGuard } from "./cursor-sdk-process-error-guard.js";
 import { prepareCursorSessionForCompaction } from "./cursor-session-compaction-prep.js";
+import { schedulePrintModeProcessExit } from "./cursor-process-keepalive.js";
 
 type CursorExtensionApi =
 	& Pick<ExtensionAPI, "registerProvider" | "registerCommand" | "on">
@@ -100,4 +101,7 @@ export default async function (pi: CursorExtensionApi) {
 	registerCursorProvider(pi, models);
 	// Register last so session_shutdown cleanup remains protected until other Cursor handlers finish.
 	registerCursorSdkSessionProcessErrorGuard(pi);
+	pi.on("session_shutdown", (event, ctx) => {
+		schedulePrintModeProcessExit(event.reason, ctx.mode);
+	});
 }

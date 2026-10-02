@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Stop pi print-mode (`-p`) from hanging after assistant text: terminal `session_shutdown` and dead-transport replacement call Cursor `Agent.close()` and bound `asyncDispose`. Print/json quit delays `process.exit` by 2s so Agent Observability can flush generation export, and does not destroy Node HTTP keep-alive agents on that path. TUI quit still destroys keep-alive agents.
 - Restore native replay wrapper ownership after `/new`, `/resume`, reloads, and session switches without replacing third-party tools (#203).
 - Apply configured `models.json` cost rates to mapped token usage with Pi's native pricing helper; default rates and Cursor billed amounts are unchanged (#230, #231; thanks @TianZuo555).
 - Resolve the installed Cursor SDK native parser package before SDK initialization, preserving explicit `CURSOR_TREE_SITTER_VENDOR_DIR` overrides (#232).

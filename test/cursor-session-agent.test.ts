@@ -651,6 +651,39 @@ describe("cursor-session-agent", () => {
 		expect(mockDispose).toHaveBeenCalledTimes(1);
 	});
 
+	it("bounds terminal session_shutdown dispose so print-mode teardown cannot hang", async () => {
+		const mockClose = vi.fn();
+		const hangingDispose = vi.fn().mockReturnValue(new Promise<never>(() => {}));
+		const createAgent = vi.fn().mockResolvedValue({
+			agentId: "agent-1",
+			close: mockClose,
+			[Symbol.asyncDispose]: hangingDispose,
+		});
+		const pi = createEventHarness();
+
+		registerCursorSessionAgentLifecycle(pi);
+		cursorSessionScopeTestUtils.set("/tmp/project", "/tmp/sessions/test.jsonl");
+		await acquireSessionCursorAgent({
+			apiKey: "test-key",
+			agentMode: "agent" as const,
+			cwd: "/tmp/project",
+			modelSelection: { id: "composer-2.5" },
+			createAgent,
+		});
+
+		const previousTimeout = sessionAgentTestUtils.setDeadTransportAgentDisposeTimeoutMs(25);
+		try {
+			const shutdownStarted = Date.now();
+			await pi.runSessionShutdown({ reason: "quit" });
+			expect(Date.now() - shutdownStarted).toBeLessThan(1000);
+			expect(sessionAgentTestUtils.sessionAgentsByScope.has("/tmp/sessions/test.jsonl")).toBe(false);
+			expect(mockClose).toHaveBeenCalledTimes(1);
+			expect(hangingDispose).toHaveBeenCalledTimes(1);
+		} finally {
+			sessionAgentTestUtils.setDeadTransportAgentDisposeTimeoutMs(previousTimeout);
+		}
+	});
+
 	it("allows reacquiring a session agent after reload session_shutdown", async () => {
 		const mockDispose = vi.fn().mockResolvedValue(undefined);
 		const createAgent = vi.fn().mockImplementation(async () => ({

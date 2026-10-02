@@ -6,6 +6,7 @@ import type {
 	SessionTreeEvent,
 } from "@earendil-works/pi-coding-agent";
 import { clearCursorSdkHttp1 } from "./cursor-http1.js";
+import { destroyCursorProcessKeepAliveHandles, shouldDestroyKeepAliveHandlesOnShutdown } from "./cursor-process-keepalive.js";
 import { onCursorSessionScopeKeyChange } from "./cursor-session-scope.js";
 import {
 	disposeSessionCursorAgent,
@@ -25,13 +26,16 @@ export function registerCursorSessionAgentLifecycle(pi: CursorSessionAgentLifecy
 	onCursorSessionScopeKeyChange(async (previousScopeKey) => {
 		await disposeSessionCursorAgent(previousScopeKey);
 	});
-	pi.on("session_shutdown", async (event) => {
+	pi.on("session_shutdown", async (event, ctx) => {
 		try {
 			if (event.reason === "reload") {
 				await resetSessionCursorAgent();
 				return;
 			}
 			await disposeSessionCursorAgent();
+			if (shouldDestroyKeepAliveHandlesOnShutdown(event.reason, ctx.mode)) {
+				destroyCursorProcessKeepAliveHandles();
+			}
 		} finally {
 			clearCursorSdkHttp1();
 		}

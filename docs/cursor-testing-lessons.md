@@ -135,6 +135,7 @@ Every live check should use its own `--session-dir` under the isolated tree. Do 
 | Naive JSONL substring scan | Successful `read` of docs mentioning replay errors looked like failures | `validate-smoke-jsonl.mjs` only flags error `toolResult` / error assistant messages |
 | Plan strip only on first turn | Under-tested multi-turn resync | Shim strips on every `turn_start`; stress multi-turn separately |
 | Assuming env auth equals pi auth | False "blocked" or false "pass" in CI-like shells | Check `auth.json` provider keys explicitly when needed |
+| Print-mode hang after stdout | pi 0.84 `runPrintMode` success path does not `process.exit()`; unbounded `Agent[Symbol.asyncDispose]()` waits on analytics/PR attribution before releasing the local executor, so ConnectRPC keep-alive to AWS pins `uv_run`. Immediate `process.exit` after shutdown races Agent Observability HTTP flush | Call `Agent.close()` first, bound `asyncDispose` on terminal `session_shutdown` / dead transport, delay print/json `process.exit` for a short HTTP flush (do not destroy global HTTP agents on that path), and close stdin for `-p`. Assert process exit with a timeout wrapper, not stdout alone |
 
 ## JSONL is the source of truth for replay regressions
 

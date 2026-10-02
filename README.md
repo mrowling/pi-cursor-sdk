@@ -570,8 +570,14 @@ pi --model cursor/grok-4.6
 Or run a one-shot command:
 
 ```bash
-pi --api-key "your-key" --model cursor/grok-4.6 -p "Say ok only"
+pi --api-key "your-key" --model cursor/grok-4.6 -p "Say ok only" </dev/null
 ```
+
+### Print mode (`-p`) prints the answer but the process does not exit
+
+Pi print mode does not call `process.exit()` after a successful run, so leftover handles keep Node alive. This extension calls Cursor `Agent.close()`, bounds SDK `asyncDispose` on session shutdown, and in print/json modes waits 2 seconds for other extensions (including Agent Observability generation export) to flush HTTP before exiting. TUI quit still destroys Node HTTP keep-alive agents.
+
+Also close stdin for redirected `-p` / `--print` runs (`</dev/null` or equivalent). An open stdin pipe is a separate hang from SDK disposal.
 
 ### Native shell parsing or module loading fails
 

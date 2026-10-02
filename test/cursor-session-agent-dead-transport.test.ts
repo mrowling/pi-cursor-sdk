@@ -17,11 +17,12 @@ describe("cursor-session-agent dead transport", () => {
 	});
 
 	it("bounds disposal of a dead-transport agent so the next acquire recreates instead of hanging", async () => {
+		const mockClose = vi.fn();
 		const hangingDispose = vi.fn().mockReturnValue(new Promise<never>(() => {}));
 		const secondDispose = vi.fn().mockResolvedValue(undefined);
 		const createAgent = vi
 			.fn()
-			.mockResolvedValueOnce({ agentId: "agent-1", [Symbol.asyncDispose]: hangingDispose })
+			.mockResolvedValueOnce({ agentId: "agent-1", close: mockClose, [Symbol.asyncDispose]: hangingDispose })
 			.mockResolvedValueOnce({ agentId: "agent-2", [Symbol.asyncDispose]: secondDispose });
 		cursorSessionScopeTestUtils.set("/tmp/project", "/tmp/sessions/test.jsonl");
 		const params = {
@@ -39,6 +40,7 @@ describe("cursor-session-agent dead transport", () => {
 			const second = await acquireSessionCursorAgent(params);
 			expect(second.created).toBe(true);
 			expect(second.agent).not.toBe(first.agent);
+			expect(mockClose).toHaveBeenCalledTimes(1);
 			expect(hangingDispose).toHaveBeenCalledTimes(1);
 		} finally {
 			sessionAgentTestUtils.setDeadTransportAgentDisposeTimeoutMs(previousTimeout);

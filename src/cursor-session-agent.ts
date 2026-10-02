@@ -228,7 +228,7 @@ function buildSessionAgentPoolKey(scopeKey: string, params: SessionCursorAgentCr
 	].join("\0");
 }
 
-async function disposePoolEntry(entry: SessionCursorAgentPoolEntry, options?: { deadTransport?: boolean }): Promise<void> {
+async function disposePoolEntry(entry: SessionCursorAgentPoolEntry, options?: { boundDispose?: boolean }): Promise<void> {
 	if (!isActivePoolEntry(entry)) return;
 	entry.bridgeRun?.cancel("Cursor session agent disposed");
 	try {
@@ -237,10 +237,19 @@ async function disposePoolEntry(entry: SessionCursorAgentPoolEntry, options?: { 
 		// disposal failure should not block session replacement
 	}
 	try {
+		// Installed @cursor/sdk local Agent.close() starts disposal without awaiting
+		// and releases the executor lease immediately. asyncDispose waits on pending
+		// PR attribution and analytics first; those waits can hang on keep-alive
+		// HTTPS and pin pi print mode, which does not process.exit() after -p.
+		if (typeof entry.agent.close === "function") {
+			try {
+				entry.agent.close();
+			} catch {
+				// close() is fire-and-forget; failure must not skip asyncDispose
+			}
+		}
 		const disposal = Promise.resolve(entry.agent[Symbol.asyncDispose]()).catch(() => undefined);
-		// A dead local transport may never settle SDK disposal; bound the wait so the
-		// next acquire recreates instead of hanging on the dead agent.
-		await (options?.deadTransport
+		await (options?.boundDispose
 			? Promise.race([
 					disposal,
 					new Promise<void>((resolve) => setTimeout(resolve, deadTransportAgentDisposeTimeoutMs).unref?.()),
@@ -271,7 +280,7 @@ async function disposePoolEntryForScope(scopeKey: string, options?: { terminal?:
 		});
 		return;
 	}
-	await disposePoolEntry(entry, { deadTransport });
+	await disposePoolEntry(entry, { boundDispose: deadTransport || options?.terminal === true });
 }
 
 function createInitialSendState(): SessionCursorAgentSendState {
